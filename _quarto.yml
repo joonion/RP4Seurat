@@ -1,0 +1,22 @@
+project:
+  type: website
+  output-dir: _site
+  render:
+    - index.qmd
+    - slides/*.qmd
+  post-render:
+    - powershell -ExecutionPolicy Bypass -File tools/post_render.ps1
+
+website:
+  title: "Seurat 분석을 위한 R 프로그래밍"
+  navbar: false
+  page-footer:
+    left: "Seurat 분석을 위한 R 프로그래밍"
+
+format:
+  html:
+    theme: cosmo
+    css: home.css
+    toc: false
+
+lang: ko

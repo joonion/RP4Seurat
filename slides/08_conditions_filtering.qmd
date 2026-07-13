@@ -1,0 +1,267 @@
+---
+title: "조건식과 데이터 필터링"
+subtitle: "QC 기준으로 분석할 세포 선택하기"
+author: "8회차"
+---
+
+## 오늘의 학습 목표 {.learning-objectives}
+
+1. 비교 연산자와 논리 연산자로 필터 조건을 작성할 수 있다.
+2. 여러 QC 기준을 하나의 논리식으로 결합할 수 있다.
+3. `subset()`을 사용해 조건을 만족하는 세포를 선택할 수 있다.
+
+## 1회차의 QC 필터를 해체합니다
+
+```r
+pbmc <- subset(
+  pbmc,
+  subset = nFeature_RNA > 200 &
+    nFeature_RNA < 2500 &
+    percent.mt < 5
+)
+```
+
+세 가지 질문에 모두 `TRUE`인 세포만 남깁니다.
+
+## 비교 연산자는 logical 값을 만듭니다
+
+| 연산자 | 의미 | 예 |
+|---|---|---|
+| `>` | 초과 | `nFeature_RNA > 200` |
+| `<` | 미만 | `percent.mt < 5` |
+| `>=` | 이상 | `nCount_RNA >= 500` |
+| `<=` | 이하 | `percent.mt <= 10` |
+| `==` | 같음 | `sample == "control"` |
+| `!=` | 같지 않음 | `cluster != "Doublet"` |
+
+## =와 ==는 역할이 다릅니다
+
+```r
+sample <- "control"       # 값을 저장
+sample == "control"       # 같은지 비교
+```
+
+```r
+data <- data.frame(
+  sample = c("control", "treatment", "control"),
+  value = c(10, 20, 15)
+)
+
+library(dplyr)
+dplyr::filter(data, sample = "control")   # 잘못된 비교
+dplyr::filter(data, sample == "control")  # 올바른 비교
+```
+
+`=`는 주로 함수 인자에 값을 전달할 때 사용합니다.
+
+## &는 두 조건을 모두 만족해야 합니다
+
+```r
+n_feature <- c(150, 600, 1200, 2800)
+
+n_feature > 200 & n_feature < 2500
+```
+
+QC에서 허용 범위의 아래쪽과 위쪽을 동시에 적용할 때 사용합니다.
+
+## |는 둘 중 하나를 만족하면 됩니다
+
+```r
+cluster <- c("B", "NK", "Mono", "T")
+
+cluster == "B" | cluster == "NK"
+cluster %in% c("B", "NK")
+```
+
+여러 값 중 하나를 선택할 때 `%in%`이 더 읽기 쉽습니다.
+
+## !는 조건을 반대로 바꿉니다
+
+```r
+is.na(percent_mt)
+!is.na(percent_mt)
+
+cluster %in% c("Doublet", "LowQuality")
+!(cluster %in% c("Doublet", "LowQuality"))
+```
+
+제외할 대상을 정의한 뒤 반대로 뒤집을 수 있습니다.
+
+## 괄호로 조건의 의미를 분명하게 합니다
+
+```r
+keep <-
+  nFeature_RNA > 200 &
+  nFeature_RNA < 2500 &
+  percent.mt < 5
+```
+
+```r
+keep <- sample == "control" &
+  (cluster == "B" | cluster == "NK")
+```
+
+복잡한 조건은 계산 우선순위에 의존하지 말고 괄호를 사용합니다.
+
+## logical 인덱싱으로 행을 필터링합니다
+
+```r
+keep <- cell_meta$nFeature_RNA > 200 &
+  cell_meta$nFeature_RNA < 2500 &
+  cell_meta$percent.mt < 5
+
+filtered_meta <- cell_meta[keep, ]
+```
+
+```r
+table(keep)
+nrow(filtered_meta)
+```
+
+필터 전후 세포 수를 항상 기록합니다.
+
+## subset()으로 데이터 프레임을 필터링합니다
+
+```r
+filtered_meta <- subset(
+  cell_meta,
+  nFeature_RNA > 200 &
+    nFeature_RNA < 2500 &
+    percent.mt < 5
+)
+```
+
+간결하지만 열 이름을 자동으로 찾는 규칙을 이해해야 합니다.
+
+## Seurat의 subset()은 객체 전체를 함께 줄입니다
+
+```r
+pbmc.filtered <- subset(
+  pbmc,
+  subset = nFeature_RNA > 200 &
+    nFeature_RNA < 2500 &
+    percent.mt < 5
+)
+```
+
+count matrix, metadata 등 세포와 연결된 구성 요소가 함께 필터링됩니다.
+
+::: {.note}
+원본과 비교하려면 새 객체 이름에 저장할 수 있습니다.
+:::
+
+## 유전자 또는 identity도 선택할 수 있습니다
+
+```r
+pbmc.cd3 <- subset(
+  pbmc,
+  subset = CD3D > 1
+)
+
+b_cells <- subset(
+  pbmc,
+  idents = "B"
+)
+```
+
+어떤 값과 layer를 기준으로 선택하는지 명확히 기록합니다.
+
+## if는 하나의 상황에 따라 흐름을 결정합니다
+
+```r
+cell_count <- ncol(pbmc)
+
+if (cell_count < 1000) {
+  message("세포 수가 적습니다.")
+} else {
+  message("분석을 계속합니다.")
+}
+```
+
+벡터 전체 필터링에는 `if`보다 logical 인덱싱을 사용합니다.
+
+## if는 길이 1인 조건을 기대합니다 {.debug}
+
+```r
+percent_mt <- c(2, 6, 3)
+
+if (percent_mt < 5) {
+  print("pass")
+}
+```
+
+여러 세포를 판정하려면 다음처럼 벡터화된 조건을 만듭니다.
+
+```r
+pass_qc <- percent_mt < 5
+```
+
+## NA가 조건에 포함되면 결과도 NA입니다
+
+```r
+percent_mt <- c(2, NA, 6)
+percent_mt < 5
+```
+
+```r
+keep <- !is.na(percent_mt) & percent_mt < 5
+```
+
+결측 세포를 제거할지, 원인을 확인할지 분석 계획에 따라 결정합니다.
+
+## 필터 결과를 검증합니다
+
+```r
+before <- ncol(pbmc)
+after <- ncol(pbmc.filtered)
+
+c(before = before, after = after, removed = before - after)
+summary(pbmc.filtered@meta.data)
+```
+
+- 남은 세포 수
+- 제외된 비율
+- 필터 후 QC 분포
+- 특정 샘플이 과도하게 제거되지 않았는지 확인
+
+## 실습 1: QC 조건 단계별 만들기 {.exercise}
+
+각 조건을 별도 객체로 만든 뒤 결합하세요.
+
+```r
+enough_features <- cell_meta$nFeature_RNA > 200
+not_too_many <- cell_meta$nFeature_RNA < 2500
+low_mito <- cell_meta$percent.mt < 5
+```
+
+각 조건과 최종 조건의 `table()` 결과를 비교하세요.
+
+## 실습 2: 기준 변화 비교하기 {.exercise}
+
+다음 두 기준으로 남는 세포 수를 비교하세요.
+
+```r
+strict <- nFeature_RNA > 300 & percent.mt < 5
+lenient <- nFeature_RNA > 200 & percent.mt < 10
+```
+
+어느 조건 때문에 차이가 생겼는지 QC 분포를 이용해 설명하세요.
+
+## 오늘의 핵심 {.summary}
+
+- 비교 연산은 세포별 logical 값을 만듭니다.
+- `&`는 모두, `|`는 하나 이상, `!`는 반대를 뜻합니다.
+- 괄호로 복잡한 조건의 의미를 명확히 합니다.
+- Seurat의 `subset()`은 객체의 연결된 정보를 함께 필터링합니다.
+- 필터 전후 세포 수와 분포를 반드시 비교합니다.
+
+## 종료 점검 {.checkpoint}
+
+1. `=`와 `==`는 어떻게 다른가요?
+2. `&`와 `|`는 어떤 상황에서 사용하나요?
+3. 여러 세포를 필터링할 때 `if`보다 logical 벡터가 적합한 이유는 무엇인가요?
+4. QC 필터 적용 후 무엇을 검증해야 하나요?
+
+## 다음 회차
+
+필터링된 Seurat 객체 안에는 count, metadata, PCA, UMAP 등 여러 종류의 정보가 함께 저장됩니다.

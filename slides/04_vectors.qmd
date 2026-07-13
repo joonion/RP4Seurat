@@ -1,0 +1,223 @@
+---
+title: "벡터와 벡터화 연산"
+subtitle: "유전자 목록과 세포별 QC 값 다루기"
+author: "4회차"
+---
+
+## 오늘의 학습 목표 {.learning-objectives}
+
+1. 벡터를 만들고 위치, 이름, 논리 조건으로 원소를 선택할 수 있다.
+2. 산술·비교·논리 연산을 벡터에 적용할 수 있다.
+3. 유전자 목록과 세포별 QC 값을 벡터로 해석하고 필터링할 수 있다.
+
+## 1회차 코드에서 벡터를 사용했습니다
+
+```r
+features <- c("nFeature_RNA", "nCount_RNA", "percent.mt")
+dims <- 1:10
+markers <- c("MS4A1", "GNLY", "CD3E", "CD14")
+```
+
+벡터는 **같은 기본 자료형의 값 여러 개를 순서대로 저장**합니다.
+
+## c()로 값을 결합합니다
+
+```r
+marker_genes <- c("MS4A1", "CD79A", "CD37")
+qc_cutoffs <- c(200, 2500, 5)
+```
+
+```r
+length(marker_genes)
+class(marker_genes)
+```
+
+`c`는 combine 또는 concatenate를 뜻합니다.
+
+## 한 벡터는 하나의 기본 자료형을 가집니다
+
+```r
+mixed <- c(200, "MS4A1", TRUE)
+mixed
+typeof(mixed)
+```
+
+서로 다른 자료형을 결합하면 더 넓게 표현할 수 있는 자료형으로 변환됩니다.
+
+::: {.warning}
+의도하지 않은 문자 변환은 이후 계산 오류의 원인이 됩니다.
+:::
+
+## 연속된 숫자를 간단히 만듭니다
+
+```r
+1:10
+seq(from = 0, to = 1, by = 0.2)
+rep(0.5, times = 4)
+```
+
+- `1:10`: PC 1부터 PC 10까지
+- `seq()`: 일정한 간격의 값
+- `rep()`: 같은 값 반복
+
+## 위치로 원소를 선택합니다
+
+```r
+markers <- c("MS4A1", "GNLY", "CD3E", "CD14")
+
+markers[1]
+markers[c(1, 4)]
+markers[2:3]
+```
+
+R의 첫 번째 위치는 0이 아니라 **1**입니다.
+
+## 음수 위치는 원소를 제외합니다
+
+```r
+markers[-1]
+markers[-c(2, 4)]
+```
+
+양수와 음수 인덱스를 한 번에 섞어 사용할 수 없습니다.
+
+## 이름으로 원소를 선택합니다
+
+```r
+qc_cutoffs <- c(
+  min_features = 200,
+  max_features = 2500,
+  max_percent_mt = 5
+)
+
+qc_cutoffs["max_percent_mt"]
+names(qc_cutoffs)
+```
+
+이름은 각 값의 의미를 코드 안에 남깁니다.
+
+## 벡터 연산은 모든 원소에 적용됩니다
+
+```r
+counts <- c(1000, 2500, 4000)
+
+counts / 1000
+log1p(counts)
+counts > 2000
+```
+
+반복문 없이도 여러 세포의 값에 같은 계산을 적용할 수 있습니다.
+
+## 비교 결과는 logical 벡터입니다
+
+```r
+n_features <- c(150, 500, 1200, 2800)
+
+n_features > 200
+n_features < 2500
+n_features > 200 & n_features < 2500
+```
+
+각 위치에서 조건을 만족하면 `TRUE`, 아니면 `FALSE`가 됩니다.
+
+## logical 벡터로 값을 필터링합니다
+
+```r
+n_features <- c(150, 500, 1200, 2800)
+keep <- n_features > 200 & n_features < 2500
+
+n_features[keep]
+```
+
+이 패턴이 Seurat QC 필터링의 기초입니다.
+
+## %in%은 목록에 포함되는지 확인합니다
+
+```r
+genes <- c("CD3D", "MS4A1", "GNLY", "LYZ")
+b_cell_markers <- c("MS4A1", "CD79A")
+
+genes %in% b_cell_markers
+genes[genes %in% b_cell_markers]
+```
+
+유전자 목록, 샘플 ID, cluster ID를 선택할 때 유용합니다.
+
+## which()는 TRUE의 위치를 반환합니다
+
+```r
+percent_mt <- c(2.1, 7.3, 1.4, 6.2)
+high_mt <- percent_mt >= 5
+
+which(high_mt)
+percent_mt[high_mt]
+```
+
+필터링만 필요하면 logical 벡터를 직접 사용하는 편이 더 간단합니다.
+
+## 결측값은 logical 조건에도 영향을 줍니다
+
+```r
+percent_mt <- c(2.1, NA, 1.4, 6.2)
+percent_mt < 5
+```
+
+```r
+keep <- !is.na(percent_mt) & percent_mt < 5
+percent_mt[keep]
+```
+
+`!`는 logical 값을 반대로 바꿉니다.
+
+## 벡터 길이가 다르면 recycling에 주의합니다 {.debug}
+
+```r
+c(1, 2, 3, 4) + c(10, 20)
+c(1, 2, 3) + c(10, 20)
+```
+
+짧은 벡터가 반복되어 계산됩니다. 길이가 맞지 않으면 경고가 발생하거나 의도하지 않은 결과가 나올 수 있습니다.
+
+## 실습 1: 유전자 목록 다루기 {.exercise}
+
+```r
+markers <- c("IL7R", "CCR7", "CD14", "LYZ", "MS4A1", "NKG7")
+```
+
+1. 첫 번째와 세 번째 유전자를 선택하세요.
+2. 마지막 유전자를 제외하세요.
+3. `c("CD14", "MS4A1")`에 포함되는 유전자만 선택하세요.
+4. 전체 원소 수를 확인하세요.
+
+## 실습 2: QC 조건 만들기 {.exercise}
+
+```r
+n_feature <- c(150, 400, 1300, 2700, 800)
+percent_mt <- c(3, 2, 7, 1, NA)
+```
+
+다음을 모두 만족하는 세포의 위치를 찾으세요.
+
+- `n_feature > 200`
+- `n_feature < 2500`
+- `percent_mt < 5`
+- `percent_mt`가 결측값이 아님
+
+## 오늘의 핵심 {.summary}
+
+- 벡터는 같은 기본 자료형의 값을 순서대로 저장합니다.
+- `[ ]` 안에 위치, 이름, logical 조건을 넣어 선택합니다.
+- 비교 연산은 logical 벡터를 반환합니다.
+- 벡터화 연산은 모든 원소에 같은 계산을 적용합니다.
+- `%in%`, `is.na()`, `!`는 분석 대상을 고를 때 유용합니다.
+
+## 종료 점검 {.checkpoint}
+
+1. R의 첫 번째 벡터 위치는 몇 번인가요?
+2. `x[x > 0]`는 무엇을 반환하나요?
+3. `%in%`은 어떤 질문에 답하나요?
+4. 길이가 다른 두 벡터를 계산할 때 무엇을 주의해야 하나요?
+
+## 다음 회차
+
+벡터를 함수에 전달하면 분석이 수행됩니다. 다음 시간에는 함수, 인자, 반환값을 읽는 법을 배웁니다.

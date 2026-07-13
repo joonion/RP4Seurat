@@ -1,0 +1,257 @@
+---
+title: "값, 변수, 기본 자료형"
+subtitle: "분석 파라미터가 R에서 표현되는 방식"
+author: "3회차"
+---
+
+## 오늘의 학습 목표 {.learning-objectives}
+
+1. numeric, character, logical 등 기본 자료형을 구분할 수 있다.
+2. 값을 객체에 할당하고 객체의 자료형과 길이를 확인할 수 있다.
+3. Seurat 코드의 QC 임계값과 함수 인자를 값과 변수의 관점에서 읽을 수 있다.
+
+## 1회차 코드에는 여러 종류의 값이 있습니다
+
+```r
+pbmc <- CreateSeuratObject(
+  counts = pbmc.data,
+  project = "pbmc3k",
+  min.cells = 3,
+  min.features = 200
+)
+```
+
+- `"pbmc3k"`: 문자
+- `3`, `200`: 숫자
+- `pbmc.data`: 다른 객체에 저장된 값
+
+## 자료형은 R이 값을 해석하는 방식입니다
+
+| 자료형 | 예 | 분석에서의 용도 |
+|---|---|---|
+| double/numeric | `5`, `0.8` | QC 값, resolution |
+| integer | `5L` | 개수, 인덱스 |
+| character | `"RNA"` | 유전자명, assay명 |
+| logical | `TRUE`, `FALSE` | 옵션, 필터 결과 |
+
+자료형이 다르면 가능한 연산도 달라집니다.
+
+## 숫자는 계산할 수 있습니다
+
+```r
+min_features <- 200
+max_features <- 2500
+feature_range <- max_features - min_features
+
+resolution <- 0.5
+resolution * 2
+```
+
+R의 일반적인 소수 숫자는 내부적으로 `double`입니다.
+
+```r
+typeof(200)
+typeof(200L)
+```
+
+## 문자는 따옴표로 감쌉니다
+
+```r
+project_name <- "pbmc3k"
+assay_name <- "RNA"
+marker_gene <- "MS4A1"
+```
+
+```r
+# 객체 이름을 찾음
+MS4A1
+
+# 문자 MS4A1을 저장
+"MS4A1"
+```
+
+유전자명과 파일 경로는 대부분 character로 표현합니다.
+
+## logical은 참과 거짓을 나타냅니다
+
+```r
+only_positive <- TRUE
+show_legend <- FALSE
+
+min_features <- 200
+min_features < 500
+min_features > 1000
+```
+
+비교 연산의 결과도 `TRUE` 또는 `FALSE`입니다.
+
+::: {.note}
+`TRUE`와 `FALSE`는 따옴표로 감싸지 않습니다.
+:::
+
+## 객체의 자료형을 확인합니다
+
+```r
+project_name <- "pbmc3k"
+resolution <- 0.5
+only_positive <- TRUE
+
+class(project_name)
+typeof(resolution)
+is.logical(only_positive)
+```
+
+- `class()`: 사용 관점의 자료형 또는 클래스
+- `typeof()`: 내부 저장 방식
+- `is.*()`: 특정 종류인지 확인
+
+## 길이는 값의 개수를 알려줍니다
+
+```r
+marker_gene <- "MS4A1"
+marker_genes <- c("MS4A1", "GNLY", "CD3E")
+
+length(marker_gene)
+length(marker_genes)
+```
+
+문자열의 글자 수가 아니라 객체에 들어 있는 **원소 수**입니다.
+
+## 자료형은 필요할 때 변환할 수 있습니다
+
+```r
+as.character(200)
+as.numeric("200")
+as.logical(1)
+```
+
+변환할 수 없는 문자는 결측값을 만듭니다.
+
+```r
+as.numeric("MS4A1")
+# Warning: NAs introduced by coercion
+```
+
+## NA는 값이 없음을 나타냅니다
+
+```r
+qc_score <- NA
+is.na(qc_score)
+```
+
+- `NA`는 아직 관측되지 않았거나 알 수 없는 값입니다.
+- 0은 측정값이 0인 것이며 `NA`와 다릅니다.
+- 빈 문자열 `""`도 `NA`와 다릅니다.
+
+## NA가 있으면 계산 결과도 NA가 될 수 있습니다
+
+```r
+qc_values <- c(100, 200, NA, 400)
+
+mean(qc_values)
+mean(qc_values, na.rm = TRUE)
+```
+
+`na.rm = TRUE`는 결측값을 제거하고 계산하라는 의미입니다.
+
+::: {.warning}
+결측값을 제거하기 전에 왜 값이 없는지 확인해야 합니다.
+:::
+
+## factor는 범주와 순서를 저장합니다
+
+```r
+cluster <- factor(c("0", "1", "0", "2"))
+cluster
+levels(cluster)
+```
+
+Seurat의 cluster identity처럼 반복되는 범주를 표현할 때 사용됩니다.
+
+```r
+class(Idents(pbmc))
+levels(pbmc)
+```
+
+## 같은 모양이라도 자료형이 다를 수 있습니다
+
+```r
+cluster_number <- 2
+cluster_label <- "2"
+
+cluster_number + 1
+cluster_label + 1
+```
+
+문자에 산술 연산을 적용하면 오류가 발생합니다.
+
+```text
+Error in cluster_label + 1 :
+  non-numeric argument to binary operator
+```
+
+## 함수 인자의 값도 자료형이 정해져 있습니다
+
+```r
+FindClusters(
+  pbmc,
+  resolution = 0.5
+)
+
+FindAllMarkers(
+  pbmc,
+  only.pos = TRUE
+)
+```
+
+- `resolution`: numeric
+- `only.pos`: logical
+
+함수 도움말의 Arguments에서 기대하는 자료형을 확인합니다.
+
+## 실습 1: 자료형 예측하기 {.exercise}
+
+실행 전에 각 객체의 자료형을 예상하세요.
+
+```r
+sample_name <- "PBMC 3K"
+cell_count <- 2700
+resolution <- 0.5
+use_positive_markers <- TRUE
+missing_group <- NA
+```
+
+`class()`, `typeof()`, `is.na()`로 예상과 비교하세요.
+
+## 실습 2: QC 설정표 만들기 {.exercise}
+
+다음 객체를 만들고 자료형을 확인하세요.
+
+```r
+min_features <- 200
+max_features <- 2500
+max_percent_mt <- 5
+species <- "human"
+remove_doublets <- FALSE
+```
+
+어떤 객체가 숫자, 문자, logical인지 설명하세요.
+
+## 오늘의 핵심 {.summary}
+
+- numeric은 계산, character는 이름과 텍스트에 사용합니다.
+- logical은 조건과 함수 옵션을 표현합니다.
+- `class()`, `typeof()`, `is.*()`로 객체를 점검합니다.
+- `NA`는 0이나 빈 문자열과 다른 결측값입니다.
+- 함수 인자에는 기대되는 자료형이 있습니다.
+
+## 종료 점검 {.checkpoint}
+
+1. `"5"`와 `5`는 어떻게 다른가요?
+2. `NA`와 0은 어떻게 다른가요?
+3. `only.pos = TRUE`에서 `TRUE`는 어떤 자료형인가요?
+4. Seurat cluster identity에 factor가 유용한 이유는 무엇인가요?
+
+## 다음 회차
+
+한 개의 값이 아니라 여러 유전자와 여러 QC 값을 한 번에 다루기 위해 **벡터**를 배웁니다.

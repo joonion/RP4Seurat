@@ -1,0 +1,44 @@
+# Quarto build output and cache
+/_site/
+/.quarto/
+/site_libs/
+/*_files/
+/slides/*_files/
+
+# Presentation files
+/powerpoint/
+/slides/*.pptx
+
+# Generated lab results
+/labs/output/
+
+# R and RStudio session files
+.Rproj.user/
+.Rhistory
+.RData
+.RDataTmp
+.Ruserdata
+
+# Local Codex metadata
+AGENTS.md
+DESIGN-GUIDE.md
+/.agents/
+/.codex/
+
+# Environment files and secrets
+.env
+.env.*
+!.env.example
+
+# Office temporary/lock files
+~$*.pptx
+~$*.docx
+~$*.xlsx
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+*~

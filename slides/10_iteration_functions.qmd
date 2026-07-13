@@ -1,0 +1,299 @@
+---
+title: "반복 작업과 사용자 정의 함수"
+subtitle: "반복되는 분석 코드를 읽기 쉽게 정리하기"
+author: "10회차"
+---
+
+## 오늘의 학습 목표 {.learning-objectives}
+
+1. `for` 반복문의 실행 흐름을 추적할 수 있다.
+2. 반복 적용 함수가 여러 객체에 같은 작업을 적용하는 방식을 설명할 수 있다.
+3. 반복되는 QC 요약 또는 시각화 코드를 작은 함수로 작성할 수 있다.
+
+## 1회차 코드에도 반복 작업이 숨어 있습니다
+
+```r
+FeaturePlot(
+  pbmc,
+  features = c("MS4A1", "GNLY", "CD3E", "CD14")
+)
+```
+
+여러 유전자에 같은 시각화 작업을 적용합니다. 반복을 직접 작성하거나 함수가 내부에서 처리할 수 있습니다.
+
+## 반복은 같은 구조의 작업을 다시 수행합니다
+
+```r
+genes <- c("MS4A1", "NKG7", "LYZ")
+
+print(genes[1])
+print(genes[2])
+print(genes[3])
+```
+
+유전자 수가 늘어나면 복사·붙여넣기가 길어지고 수정 실수가 발생합니다.
+
+## for는 벡터의 원소를 하나씩 가져옵니다
+
+```r
+genes <- c("MS4A1", "NKG7", "LYZ")
+
+for (gene in genes) {
+  print(gene)
+}
+```
+
+읽는 순서:
+
+1. `genes`에서 원소 하나 선택
+2. 선택한 값을 `gene`에 저장
+3. `{ }` 안의 코드 실행
+4. 다음 원소로 반복
+
+## 반복 중 값의 변화를 추적합니다
+
+```r
+counts <- c(10, 20, 30)
+total <- 0
+
+for (value in counts) {
+  total <- total + value
+  print(total)
+}
+```
+
+각 반복이 끝날 때 `total`은 10 → 30 → 60으로 변합니다.
+
+## 결과를 저장할 공간을 먼저 준비합니다
+
+```r
+genes <- c("MS4A1", "NKG7", "LYZ")
+name_lengths <- numeric(length(genes))
+
+for (i in seq_along(genes)) {
+  name_lengths[i] <- nchar(genes[i])
+}
+
+name_lengths
+```
+
+`seq_along()`은 벡터 길이에 맞는 안전한 위치를 만듭니다.
+
+## 분석에서는 결과를 리스트에 저장할 수 있습니다
+
+```r
+genes <- c("MS4A1", "NKG7", "LYZ")
+plots <- vector("list", length(genes))
+
+for (i in seq_along(genes)) {
+  plots[[i]] <- FeaturePlot(pbmc, features = genes[i])
+}
+
+names(plots) <- genes
+```
+
+plot처럼 복합 객체 여러 개는 리스트에 저장합니다.
+
+## lapply()는 반복 결과를 리스트로 반환합니다
+
+```r
+plots <- lapply(
+  genes,
+  function(gene) {
+    FeaturePlot(pbmc, features = gene)
+  }
+)
+```
+
+- 입력 벡터의 원소마다 함수를 적용합니다.
+- 반환값을 자동으로 리스트에 모읍니다.
+- 반복 결과가 필요할 때 유용합니다.
+
+## 익명 함수는 그 자리에서 정의합니다
+
+```r
+lapply(
+  genes,
+  function(gene) {
+    paste("marker:", gene)
+  }
+)
+```
+
+한 번만 사용하는 짧은 작업에 적합합니다.
+
+```r
+lapply(genes, \(gene) paste("marker:", gene))
+```
+
+`\(gene)`는 최신 R의 간단한 함수 표기입니다.
+
+## vapply()는 기대하는 결과 자료형을 확인합니다
+
+```r
+gene_lengths <- vapply(
+  genes,
+  nchar,
+  integer(1)
+)
+```
+
+각 입력에서 길이 1인 integer가 나와야 한다고 명시합니다.
+
+결과 구조가 중요할 때 `lapply()`보다 안전할 수 있습니다.
+
+## purrr::map()도 같은 반복 패턴을 표현합니다
+
+```r
+library(purrr)
+
+plots <- map(
+  genes,
+  ~ FeaturePlot(pbmc, features = .x)
+)
+```
+
+| 함수 | 반환 형태 |
+|---|---|
+| `map()` | 리스트 |
+| `map_chr()` | character 벡터 |
+| `map_dbl()` | double 벡터 |
+| `map_dfr()` | 행 방향으로 결합된 데이터 프레임 |
+
+## 사용자 정의 함수는 반복되는 의도를 이름으로 만듭니다
+
+```r
+qc_pass <- function(
+  n_feature,
+  percent_mt,
+  min_feature = 200,
+  max_feature = 2500,
+  max_mt = 5
+) {
+  n_feature > min_feature &
+    n_feature < max_feature &
+    percent_mt < max_mt
+}
+```
+
+함수 이름만으로 작업의 목적을 알 수 있습니다.
+
+## 함수를 작은 예제로 먼저 검사합니다
+
+```r
+qc_pass(
+  n_feature = c(100, 800, 3000),
+  percent_mt = c(2, 3, 1)
+)
+```
+
+확인할 상황:
+
+- 경계값 바로 아래와 위
+- 결측값
+- 길이가 다른 입력
+- 예상하지 않은 자료형
+
+## Seurat 객체를 받는 작은 함수를 만들 수 있습니다
+
+```r
+summarize_qc <- function(object) {
+  data.frame(
+    cells = ncol(object),
+    median_features = median(object$nFeature_RNA),
+    median_counts = median(object$nCount_RNA),
+    median_percent_mt = median(object$percent.mt)
+  )
+}
+
+summarize_qc(pbmc)
+```
+
+입력 객체와 반환 데이터 프레임이 명확한 작은 함수입니다.
+
+## 여러 샘플에 같은 요약 함수를 적용합니다
+
+```r
+sample_list <- list(
+  control = control_pbmc,
+  treated = treated_pbmc
+)
+
+qc_tables <- lapply(sample_list, summarize_qc)
+qc_summary <- do.call(rbind, qc_tables)
+```
+
+동일한 정의로 샘플을 비교할 수 있습니다.
+
+## 함수 안에서 전역 객체에 의존하지 않습니다 {.debug}
+
+```r
+# 피하기: 함수 밖 pbmc에 고정
+plot_gene <- function(gene) {
+  FeaturePlot(pbmc, features = gene)
+}
+
+# 권장: 필요한 객체를 인자로 받기
+plot_gene <- function(object, gene) {
+  FeaturePlot(object, features = gene)
+}
+```
+
+입력이 명시된 함수가 재사용과 검증에 유리합니다.
+
+## 오류를 어느 반복에서 만났는지 기록합니다
+
+```r
+for (gene in genes) {
+  message("Plotting: ", gene)
+  print(FeaturePlot(pbmc, features = gene))
+}
+```
+
+많은 대상을 반복할 때 현재 처리 중인 샘플이나 유전자를 남기면 디버깅이 쉬워집니다.
+
+## 실습 1: for 반복문으로 QC 요약하기 {.exercise}
+
+```r
+qc_columns <- c("nFeature_RNA", "nCount_RNA", "percent.mt")
+```
+
+각 열의 중앙값을 계산하여 이름 있는 numeric 벡터에 저장하세요.
+
+힌트:
+
+```r
+pbmc[[column_name]]
+median(...)
+```
+
+## 실습 2: 마커 plot 함수 만들기 {.exercise}
+
+다음 형태의 함수를 완성하세요.
+
+```r
+plot_marker <- function(object, gene) {
+  # FeaturePlot을 반환
+}
+```
+
+세 유전자에 `lapply()` 또는 `map()`으로 적용하여 plot 리스트를 만드세요.
+
+## 오늘의 핵심 {.summary}
+
+- `for`는 원소를 하나씩 가져와 같은 코드를 실행합니다.
+- 반복 결과는 미리 준비한 벡터나 리스트에 저장합니다.
+- `lapply()`와 `map()`은 적용과 결과 수집을 함께 표현합니다.
+- 사용자 정의 함수는 입력, 작업, 반환값을 하나의 이름으로 묶습니다.
+- 작은 함수는 전역 객체보다 명시적인 인자를 사용합니다.
+
+## 종료 점검 {.checkpoint}
+
+1. `for (gene in genes)`에서 `gene`은 언제 바뀌나요?
+2. plot 여러 개를 저장할 때 리스트가 적합한 이유는 무엇인가요?
+3. 반복문과 `lapply()`는 어떤 공통점을 가지나요?
+4. 함수가 필요한 객체를 인자로 받는 것이 좋은 이유는 무엇인가요?
+
+## 다음 회차
+
+반복해서 만든 분석 결과를 `dplyr`로 정리하고 `ggplot2`와 Seurat plot으로 시각화합니다.

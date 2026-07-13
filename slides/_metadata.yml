@@ -1,0 +1,27 @@
+format:
+  revealjs:
+    theme: custom.scss
+    width: 1600
+    height: 900
+    margin: 0.06
+    slide-number: c/t
+    code-copy: true
+    code-overflow: wrap
+    navigation-mode: linear
+    transition: none
+    background-transition: none
+    center: false
+    controls-layout: edges
+    controls-tutorial: false
+    progress: false
+    hash: true
+    footer: "Seurat 분석을 위한 R 프로그래밍"
+    highlight-style: github
+  pptx:
+    reference-doc: ../assets/seurat-r-reference.pptx
+    slide-level: 2
+
+slide-level: 2
+lang: ko
+filters:
+  - ../tools/pptx-code-explanation.lua

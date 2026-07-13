@@ -1,0 +1,572 @@
+---
+title: "Zeisel 데이터로 Guided Clustering 완주하기"
+subtitle: "RDS 로드부터 cluster 해석과 결과 저장까지"
+author: "12회차"
+---
+
+## 오늘의 학습 목표 {.learning-objectives}
+
+1. 저장된 Zeisel Seurat 객체를 불러와 구조와 metadata를 점검할 수 있다.
+2. Guided Clustering의 QC부터 marker 탐색까지 같은 흐름으로 실행할 수 있다.
+3. 분석 파라미터를 바꾸고 cluster를 저자 제공 label과 비교·해석할 수 있다.
+
+## 오늘은 새 데이터로 전체 흐름을 직접 완주합니다
+
+| 1회차 | 12회차 |
+|---|---|
+| PBMC 3K 코드를 따라 실행 | Zeisel mouse brain 객체에 직접 적용 |
+| 전체 분석 순서 파악 | 각 단계의 입력·출력 검증 |
+| 공식 파라미터 사용 | 데이터 분포를 보고 값 수정 |
+| PBMC marker 관찰 | mouse brain marker로 cluster 해석 |
+
+분석 순서는 같지만 **데이터와 생물학적 맥락은 다릅니다**.
+
+## 오늘의 60분 분석 지도
+
+| 시간 | 단계 | 완성할 결과 |
+|---:|---|---|
+| 0–10분 | RDS 로드·객체 점검 | raw Seurat 객체 확인 |
+| 10–20분 | QC·세포 필터링 | 분석할 세포 선택 |
+| 20–35분 | 정규화·PCA | 저차원 표현 생성 |
+| 35–45분 | graph clustering·UMAP | cluster 지도 생성 |
+| 45–55분 | marker·label 비교 | cluster 해석 |
+| 55–60분 | 파라미터 수정·저장 | 재현 가능한 결과 |
+
+## 실습 파일과 입력 객체 {.prerequisites}
+
+RStudio에서 `labs/labs.Rproj`를 연 뒤 다음 파일을 사용합니다.
+
+```text
+labs/
+├─ 12_apply_guided_clustering.R
+├─ data/zeisel/zeisel_brain_raw.rds
+└─ output/
+```
+
+필요한 패키지:
+
+```r
+library(Seurat)
+library(dplyr)
+library(ggplot2)
+library(patchwork)
+```
+
+## 출발점은 이미 만들어진 raw Seurat 객체입니다
+
+`A_create_zeisel_rds_from_scRNAseq.R`에서 다음 과정을 미리 수행했습니다.
+
+```text
+ZeiselBrainData()
+       ↓ counts + colData
+CreateSeuratObject()
+       ↓
+zeisel_brain_raw.rds
+```
+
+오늘은 데이터 다운로드와 객체 생성을 반복하지 않고 분석에 집중합니다.
+
+## RDS를 불러오면 객체가 그대로 복원됩니다 {.section-divider}
+
+먼저 경로, class, dimension, 내부 정보를 확인합니다.
+
+## `readRDS()`의 반환값을 객체에 할당합니다
+
+```r
+data_path <- "data/zeisel/zeisel_brain_raw.rds"
+stopifnot(file.exists(data_path))
+
+brain <- readRDS(data_path)
+```
+
+| 입력 | 함수 | 출력 |
+|---|---|---|
+| RDS 파일 경로 | `readRDS()` | 메모리의 Seurat 객체 |
+
+`readRDS()`는 객체 이름까지 복원하지 않으므로 `brain <-`이 필요합니다.
+
+## 분석 전에 객체 계약부터 확인합니다
+
+```r
+class(brain)
+dim(brain)
+Assays(brain)
+Layers(brain[["RNA"]])
+head(brain[[]])
+```
+
+기대 상태:
+
+- `Seurat` class
+- 18,913 features × 3,005 cells
+- `RNA` assay와 raw `counts` layer
+- cell metadata에 `level1class`, `level2class`
+
+기대와 다르면 다음 단계로 넘어가지 않습니다.
+
+## reference label은 마지막 검증까지 보류합니다
+
+```r
+names(brain[[]])
+table(brain$level1class)
+```
+
+`level1class`와 `level2class`는 원 데이터 저자가 제공한 cell type label입니다.
+
+오늘의 원칙:
+
+1. label을 보지 않고 clustering을 실행합니다.
+2. marker로 cluster를 먼저 해석합니다.
+3. 마지막에 reference label과 비교합니다.
+
+## QC 기준은 Zeisel 분포에서 다시 정합니다 {.section-divider}
+
+PBMC 기준을 mouse brain 데이터에 그대로 복사하지 않습니다.
+
+## Mouse mitochondrial gene은 `^mt-`로 찾습니다
+
+```r
+sum(grepl("^mt-", rownames(brain)))
+
+brain[["percent.mt"]] <- PercentageFeatureSet(
+  brain,
+  pattern = "^mt-"
+)
+```
+
+PBMC tutorial의 human gene symbol은 보통 `^MT-`를 사용합니다.
+
+대소문자 하나가 QC 값을 완전히 바꿀 수 있으므로 먼저 feature 이름을 확인합니다.
+
+## 임계값보다 분포를 먼저 봅니다
+
+```r
+VlnPlot(
+  brain,
+  features = c(
+    "nFeature_RNA",
+    "nCount_RNA",
+    "percent.mt"
+  ),
+  ncol = 3,
+  pt.size = 0
+)
+```
+
+```r
+summary(brain$nFeature_RNA)
+summary(brain$percent.mt)
+```
+
+낮은 feature 수, 지나치게 높은 feature 수, 높은 mitochondrial 비율을 확인합니다.
+
+## 이번 실습의 QC 값은 시작점이지 정답이 아닙니다
+
+```r
+min_features <- 1000
+max_features <- 7500
+max_percent_mt <- 25
+
+keep <- brain$nFeature_RNA > min_features &
+  brain$nFeature_RNA < max_features &
+  brain$percent.mt < max_percent_mt
+
+table(keep)
+```
+
+현재 객체에서는 이 기준으로 약 2,900개 세포가 남습니다.
+
+## 필터 전후 세포 수를 반드시 기록합니다
+
+```r
+cells_before_qc <- ncol(brain)
+
+brain <- subset(
+  brain,
+  subset = nFeature_RNA > min_features &
+    nFeature_RNA < max_features &
+    percent.mt < max_percent_mt
+)
+
+c(before = cells_before_qc,
+  after = ncol(brain))
+```
+
+`subset()`은 조건을 만족하는 세포로 구성된 새 Seurat 객체를 반환합니다.
+
+## 전처리는 객체에 새 분석 결과를 추가합니다 {.section-divider}
+
+정규화 → 고변이 유전자 → scaling 순서를 추적합니다.
+
+## `NormalizeData()`는 normalized data layer를 만듭니다
+
+```r
+brain <- NormalizeData(
+  brain,
+  normalization.method = "LogNormalize",
+  scale.factor = 10000
+)
+
+Layers(brain[["RNA"]])
+```
+
+| 입력 | 핵심 인자 | 객체 변화 |
+|---|---|---|
+| raw counts | method, scale factor | normalized `data` layer 추가 |
+
+## 고변이 유전자 2,000개가 PCA의 입력이 됩니다
+
+```r
+brain <- FindVariableFeatures(
+  brain,
+  selection.method = "vst",
+  nfeatures = 2000
+)
+
+top10_variable <- head(
+  VariableFeatures(brain),
+  10
+)
+```
+
+```r
+length(VariableFeatures(brain))
+VariableFeaturePlot(brain)
+```
+
+모든 gene이 아니라 cell 간 차이를 잘 드러내는 gene에 집중합니다.
+
+## scaling 후 PCA로 주요 변화 축을 찾습니다
+
+```r
+brain <- ScaleData(
+  brain,
+  features = VariableFeatures(brain)
+)
+
+brain <- RunPCA(
+  brain,
+  features = VariableFeatures(brain),
+  npcs = 30
+)
+```
+
+```r
+Reductions(brain)
+print(brain[["pca"]], dims = 1:5, nfeatures = 5)
+```
+
+## PC 수는 다음 단계의 입력 파라미터입니다
+
+```r
+ElbowPlot(brain, ndims = 30)
+
+DimHeatmap(
+  brain,
+  dims = 1:10,
+  cells = 500,
+  balanced = TRUE
+)
+```
+
+이번 실습의 공통 시작값:
+
+```r
+dims_to_use <- 1:20
+```
+
+Elbow와 PC loading을 근거로 다른 값을 시험할 수 있습니다.
+
+## 같은 PC로 graph clustering과 UMAP을 계산합니다 {.section-divider}
+
+`dims_to_use`가 두 분석의 공통 입력입니다.
+
+## 이웃 그래프를 만든 뒤 cluster를 찾습니다
+
+```r
+brain <- FindNeighbors(
+  brain,
+  dims = dims_to_use
+)
+
+brain <- FindClusters(
+  brain,
+  resolution = 0.5,
+  random.seed = 42
+)
+
+table(Idents(brain))
+```
+
+`resolution`이 커지면 일반적으로 cluster가 더 세분화됩니다.
+
+## UMAP은 cluster를 계산하지 않습니다
+
+```r
+brain <- RunUMAP(
+  brain,
+  dims = dims_to_use,
+  seed.use = 42
+)
+
+DimPlot(
+  brain,
+  reduction = "umap",
+  label = TRUE,
+  repel = TRUE
+)
+```
+
+UMAP은 선택한 PC 공간을 2차원으로 표현하는 시각화입니다.
+
+## cluster와 reference label을 같은 좌표에서 비교합니다
+
+```r
+cluster_umap <- DimPlot(
+  brain,
+  group.by = "seurat_clusters",
+  label = TRUE
+)
+
+reference_umap <- DimPlot(
+  brain,
+  group.by = "level1class",
+  label = TRUE
+)
+
+cluster_umap + reference_umap
+```
+
+좌표는 같고 점의 색을 정하는 변수만 다릅니다.
+
+## 교차표는 cluster의 섞임을 수치로 보여줍니다
+
+```r
+cluster_reference <- table(
+  cluster = Idents(brain),
+  reference = brain$level1class
+)
+
+cluster_reference
+round(
+  prop.table(cluster_reference, margin = 1),
+  2
+)
+```
+
+cluster마다 어떤 reference class가 많은지, 여러 class가 섞였는지 확인합니다.
+
+## Marker를 근거로 cluster를 해석합니다 {.section-divider}
+
+label을 붙이기 전에 differential expression 결과를 확인합니다.
+
+## 모든 cluster의 positive marker를 계산합니다
+
+```r
+markers <- FindAllMarkers(
+  brain,
+  only.pos = TRUE,
+  min.pct = 0.25,
+  logfc.threshold = 0.25,
+  max.cells.per.ident = 100,
+  random.seed = 42
+)
+```
+
+`max.cells.per.ident = 100`은 60분 실습을 위한 subsampling입니다. 최종 연구 분석에서는 전체 세포 결과와 비교합니다.
+
+```r
+top_markers <- markers |>
+  filter(p_val_adj < 0.05) |>
+  group_by(cluster) |>
+  slice_max(avg_log2FC, n = 5) |>
+  ungroup()
+```
+
+`FindAllMarkers()`의 비교 단위는 현재 `Idents(brain)`입니다.
+
+## Mouse brain marker panel로 교차 확인합니다
+
+```r
+marker_panel <- c(
+  "Gad1", "Slc17a7", "Mbp",
+  "Aldoc", "C1qa", "Pdgfrb"
+)
+
+DotPlot(
+  brain,
+  features = marker_panel
+) + RotatedAxis()
+```
+
+한 marker 하나가 아니라 top marker, marker panel, reference label을 함께 봅니다.
+
+`DoHeatmap()`에 넣을 top marker는 객체 복사본에서 `ScaleData(features = ...)`로 scaling합니다. 원래 `brain`의 `scale.data`는 유지합니다.
+
+## 교육용 reference label은 해석을 검증하는 장치입니다
+
+```r
+majority_labels <- as.data.frame(cluster_reference) |>
+  filter(Freq > 0) |>
+  group_by(cluster) |>
+  slice_max(Freq, n = 1, with_ties = FALSE) |>
+  ungroup()
+```
+
+```r
+new_ids <- setNames(
+  as.character(majority_labels$reference),
+  as.character(majority_labels$cluster)
+)
+
+brain <- RenameIdents(brain, new_ids)
+```
+
+실제 연구에서는 marker 근거와 외부 reference를 별도로 검토해야 합니다.
+
+## 실습 1: QC 기준 하나만 바꾸기 {.exercise}
+
+목표: 필터 조건이 보존되는 세포에 미치는 영향을 설명합니다.
+
+1. 원본 RDS를 다시 불러오세요.
+2. `max_percent_mt`를 `15` 또는 `35`로 바꾸세요.
+3. 전후 세포 수와 QC violin plot을 비교하세요.
+4. 어느 세포가 더 제거되거나 보존되는지 한 문장으로 기록하세요.
+
+다른 파라미터는 바꾸지 않습니다.
+
+## 실습 2: resolution 하나만 바꾸기 {.exercise}
+
+```r
+brain_test <- FindClusters(
+  brain,
+  resolution = 0.8,
+  random.seed = 42
+)
+
+table(Idents(brain_test))
+DimPlot(
+  brain_test,
+  reduction = "umap",
+  label = TRUE
+)
+```
+
+`0.5` 결과와 cluster 수, 분리 양상, reference label의 섞임을 비교하세요.
+
+## 실습 3: cluster 하나를 근거로 설명하기 {.exercise}
+
+한 cluster를 선택해 다음 네 문장을 완성하세요.
+
+1. 이 cluster에는 약 ___개 세포가 있다.
+2. 대표 marker는 ___, ___, ___이다.
+3. marker panel에서는 ___ 발현이 두드러진다.
+4. 저자 제공 `level1class`의 ___와 주로 일치하며, 근거는 ___이다.
+
+코드 결과를 가리키며 1분 안에 설명합니다.
+
+## 결과 객체·표·그림을 구분해 저장합니다
+
+```r
+dir.create("output", showWarnings = FALSE)
+
+saveRDS(
+  brain,
+  "output/zeisel_brain_guided_clustering.rds"
+)
+
+write.csv(
+  markers,
+  "output/zeisel_brain_markers.csv",
+  row.names = FALSE
+)
+```
+
+`ggsave()`로 최종 UMAP도 `output/`에 저장합니다.
+
+## 오류 1: RDS 파일을 찾을 수 없습니다 {.debug}
+
+```text
+Error: file.exists(data_path) is not TRUE
+```
+
+확인 순서:
+
+```r
+getwd()
+list.files()
+list.files("data/zeisel")
+```
+
+`labs/labs.Rproj`를 열었는지, RDS 파일명이 맞는지 확인합니다.
+
+## 오류 2: `percent.mt`가 모두 0입니다 {.debug}
+
+```r
+head(rownames(brain))
+sum(grepl("^mt-", rownames(brain)))
+sum(grepl("^MT-", rownames(brain)))
+```
+
+원인:
+
+- organism과 gene naming convention이 다름
+- gene symbol이 아니라 Ensembl ID 사용
+- 정규식의 대소문자가 맞지 않음
+
+## 오류 3: UMAP이나 marker 단계가 실행되지 않습니다 {.debug}
+
+```r
+Reductions(brain)
+Graphs(brain)
+table(Idents(brain))
+Layers(brain[["RNA"]])
+```
+
+확인할 앞 단계:
+
+- UMAP 전: `RunPCA()`와 `FindNeighbors()`
+- marker 전: `NormalizeData()`와 `FindClusters()`
+- plot 전: 요청한 feature가 `rownames(brain)`에 존재하는지
+
+## 한 객체에 분석 결과가 단계적으로 쌓입니다 {.summary}
+
+| 단계 | 객체에서 확인할 것 |
+|---|---|
+| RDS 로드 | `class()`, `dim()`, `Layers()` |
+| QC | `percent.mt`, 필터 후 세포 수 |
+| 정규화 | normalized `data` layer |
+| 고변이 유전자 | `VariableFeatures()` |
+| PCA | `Reductions(brain)` |
+| clustering | `Graphs()`, `Idents()` |
+| UMAP | `Embeddings(brain[["umap"]])` |
+| marker | `markers` data frame |
+
+## 최종 종료 점검 {.checkpoint}
+
+1. 이 데이터에서 mitochondrial pattern이 `^mt-`인 이유는 무엇인가요?
+2. QC 기준을 PBMC tutorial과 다르게 정한 근거는 무엇인가요?
+3. `dims_to_use`는 어떤 두 단계의 입력으로 재사용되나요?
+4. cluster와 `level1class`가 일치하지 않을 때 무엇을 점검해야 하나요?
+5. 자신의 데이터에는 어떤 경로, 조건, marker를 바꿔야 하나요?
+
+## 이제 Guided Clustering 코드를 새 데이터에 적용할 수 있습니다
+
+- `readRDS()`로 분석 출발점을 복원했습니다.
+- 분포를 보고 Zeisel 데이터의 QC 조건을 적용했습니다.
+- 정규화, PCA, graph clustering, UMAP을 같은 객체에 누적했습니다.
+- marker와 저자 제공 label을 함께 사용해 cluster를 검증했습니다.
+- 파라미터를 하나씩 바꾸고 결과를 저장했습니다.
+
+::: {.note}
+분석을 실행했다는 사실보다, 각 값의 근거와 객체의 변화를 설명하는 것이 최종 목표입니다.
+:::
+
+## 공식 문서와 데이터 출처
+
+- Seurat, **Guided Clustering Tutorial**.  
+  <https://satijalab.org/seurat/articles/pbmc3k_tutorial>
+- Bioconductor `scRNAseq`, **ZeiselBrainData** reference manual.
+  <https://bioconductor.org/packages/release/data/experiment/manuals/scRNAseq/man/scRNAseq.pdf>
+
+사용한 로컬 환경의 버전은 실습 마지막의 `sessionInfo()`와 `packageVersion()`으로 기록합니다.

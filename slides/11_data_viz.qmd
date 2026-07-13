@@ -1,0 +1,353 @@
+---
+title: "데이터 변환과 시각화 코드 읽기"
+subtitle: "dplyr와 ggplot2로 분석 결과 해석하기"
+author: "11회차"
+---
+
+## 오늘의 학습 목표 {.learning-objectives}
+
+1. `dplyr`의 주요 동사를 이용해 표 데이터를 선택, 변환, 요약할 수 있다.
+2. `ggplot2` 코드에서 data, aesthetics, geometry를 구분할 수 있다.
+3. Seurat 시각화 결과를 읽고 연구 질문에 맞게 표시 옵션을 수정할 수 있다.
+
+## 1회차에서 marker table을 변환했습니다
+
+```r
+pbmc.markers %>%
+  group_by(cluster) %>%
+  filter(avg_log2FC > 1) %>%
+  slice_head(n = 10) %>%
+  ungroup() -> top10
+```
+
+위에서 아래로 데이터가 어떻게 달라지는지 추적합니다.
+
+## tidy data는 한 변수, 한 관측값의 위치가 명확합니다
+
+| cell_id | cluster | gene | expression |
+|---|---:|---|---:|
+| cell_A | 0 | IL7R | 2.8 |
+| cell_A | 0 | CCR7 | 1.4 |
+| cell_B | 1 | IL7R | 0.0 |
+
+- 열: 변수
+- 행: 관측값
+- 셀: 하나의 값
+
+데이터 형태는 분석과 plot 작성 방식에 영향을 줍니다.
+
+## 파이프는 한 단계의 결과를 다음 단계로 보냅니다
+
+```r
+pbmc.markers |>
+  filter(avg_log2FC > 1) |>
+  select(cluster, gene, avg_log2FC)
+```
+
+읽는 방법:
+
+1. `pbmc.markers`에서 시작
+2. 조건에 맞는 행 선택
+3. 필요한 열 선택
+
+## select()는 열을 선택합니다
+
+```r
+marker_small <- pbmc.markers |>
+  select(cluster, gene, avg_log2FC, p_val_adj)
+```
+
+```r
+select(pbmc.markers, starts_with("pct"))
+select(pbmc.markers, -p_val)
+```
+
+분석 목적에 필요한 열만 남기면 표를 읽기 쉬워집니다.
+
+## filter()는 조건에 맞는 행을 선택합니다
+
+```r
+strong_markers <- pbmc.markers |>
+  filter(
+    avg_log2FC > 1,
+    p_val_adj < 0.05,
+    pct.1 > 0.25
+  )
+```
+
+쉼표로 나열한 조건은 모두 만족해야 합니다.
+
+## mutate()는 열을 만들거나 변환합니다
+
+```r
+marker_labeled <- pbmc.markers |>
+  mutate(
+    significant = p_val_adj < 0.05,
+    pct_difference = pct.1 - pct.2
+  )
+```
+
+기존 열을 이용해 해석에 필요한 새 변수를 만듭니다.
+
+## arrange()는 행의 순서를 바꿉니다
+
+```r
+marker_ranked <- pbmc.markers |>
+  arrange(cluster, desc(avg_log2FC))
+```
+
+- 기본: 오름차순
+- `desc()`: 내림차순
+
+정렬은 데이터를 제거하지 않고 표시 순서만 바꿉니다.
+
+## group_by()와 summarise()는 그룹별 요약을 만듭니다
+
+```r
+cluster_summary <- pbmc.markers |>
+  group_by(cluster) |>
+  summarise(
+    marker_count = n(),
+    median_log2fc = median(avg_log2FC),
+    .groups = "drop"
+  )
+```
+
+`group_by(cluster)` 이후의 계산은 cluster별로 수행됩니다.
+
+## slice_max()로 그룹별 상위 항목을 선택합니다
+
+```r
+top_markers <- pbmc.markers |>
+  filter(avg_log2FC > 1) |>
+  group_by(cluster) |>
+  slice_max(
+    order_by = avg_log2FC,
+    n = 5,
+    with_ties = FALSE
+  ) |>
+  ungroup()
+```
+
+최종 결과가 더 이상 그룹 상태일 필요가 없으면 `ungroup()`합니다.
+
+## 단계마다 결과를 확인하면 오류를 빨리 찾습니다
+
+```r
+step1 <- filter(pbmc.markers, avg_log2FC > 1)
+dim(step1)
+
+step2 <- group_by(step1, cluster)
+step3 <- slice_head(step2, n = 10)
+```
+
+긴 파이프가 예상과 다르면 중간 단계의 `dim()`, `names()`, `head()`를 확인합니다.
+
+## ggplot2는 세 요소로 읽습니다
+
+```r
+ggplot(
+  data = cell_meta,
+  mapping = aes(x = nCount_RNA, y = nFeature_RNA)
+) +
+  geom_point()
+```
+
+::: {.flow}
+::: {}
+**data**
+
+어떤 표인가?
+:::
+::: {}
+**aesthetics**
+
+열을 어디에 연결하는가?
+:::
+::: {}
+**geometry**
+
+어떤 모양으로 그리는가?
+:::
+:::
+
+## aesthetics는 데이터를 시각 속성에 연결합니다
+
+```r
+ggplot(
+  cell_meta,
+  aes(
+    x = nCount_RNA,
+    y = nFeature_RNA,
+    color = percent.mt
+  )
+) +
+  geom_point()
+```
+
+- `x`, `y`: 위치
+- `color`: 데이터 값에 따른 색
+- 고정 색은 `aes()` 밖에 작성합니다.
+
+```r
+geom_point(color = "#2563EB")
+```
+
+## layer를 더해 plot을 완성합니다
+
+```r
+ggplot(cell_meta, aes(nCount_RNA, nFeature_RNA)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(
+    x = "Total UMI count",
+    y = "Detected genes",
+    title = "Cell-level QC"
+  ) +
+  theme_minimal()
+```
+
+`+` 뒤에 시각화 layer를 순서대로 추가합니다.
+
+## Seurat 시각화 함수도 ggplot 객체를 반환합니다
+
+```r
+plot <- DimPlot(
+  pbmc,
+  reduction = "umap",
+  group.by = "seurat_clusters",
+  label = TRUE
+)
+
+class(plot)
+```
+
+`ggplot2` layer를 더해 표시 형식을 바꿀 수 있습니다.
+
+```r
+plot + labs(title = "PBMC 3K clusters") + NoLegend()
+```
+
+## group.by와 split.by는 질문이 다릅니다
+
+```r
+DimPlot(
+  pbmc,
+  reduction = "umap",
+  group.by = "cell_type"
+)
+```
+
+```r
+DimPlot(
+  pbmc,
+  reduction = "umap",
+  group.by = "cell_type",
+  split.by = "sample"
+)
+```
+
+- `group.by`: 점의 색을 어떤 변수로 나눌 것인가?
+- `split.by`: 어떤 변수별 패널로 나눌 것인가?
+
+## FeaturePlot은 발현 위치를 보여줍니다
+
+```r
+FeaturePlot(
+  pbmc,
+  features = c("MS4A1", "NKG7", "LYZ"),
+  order = TRUE,
+  min.cutoff = "q10",
+  max.cutoff = "q90"
+)
+```
+
+- 같은 색 척도로 비교하는지 확인합니다.
+- cutoff는 극단값이 색 범위를 지배하는 것을 조절합니다.
+- 발현 위치만으로 세포 유형을 단정하지 않습니다.
+
+## VlnPlot은 그룹별 분포를 보여줍니다
+
+```r
+VlnPlot(
+  pbmc,
+  features = c("nFeature_RNA", "percent.mt"),
+  group.by = "sample",
+  pt.size = 0
+)
+```
+
+중앙값뿐 아니라 분포의 폭, 꼬리, 이상값을 함께 봅니다.
+
+## DotPlot은 여러 유전자와 그룹을 압축해 비교합니다
+
+```r
+DotPlot(
+  pbmc,
+  features = c("IL7R", "MS4A1", "NKG7", "LYZ"),
+  group.by = "cell_type"
+) + RotatedAxis()
+```
+
+일반적으로:
+
+- 점 크기: 발현 세포 비율
+- 점 색: 평균 발현량
+
+범례의 정확한 의미를 확인합니다.
+
+## plot을 저장할 때 크기를 명시합니다
+
+```r
+umap_plot <- DimPlot(pbmc, reduction = "umap", label = TRUE)
+
+ggsave(
+  filename = "output/pbmc3k_umap.png",
+  plot = umap_plot,
+  width = 10,
+  height = 7,
+  dpi = 300
+)
+```
+
+저장 크기와 해상도는 화면 및 논문용 결과의 가독성을 결정합니다.
+
+## 실습 1: cluster별 상위 마커 정리하기 {.exercise}
+
+`pbmc.markers`에서 다음 조건으로 표를 만드세요.
+
+1. `p_val_adj < 0.05`
+2. `avg_log2FC > 1`
+3. cluster별 `avg_log2FC` 상위 5개
+4. `cluster`, `gene`, `avg_log2FC`, `pct.1`, `pct.2`만 선택
+
+각 단계의 행 수를 기록하세요.
+
+## 실습 2: UMAP 질문 바꾸기 {.exercise}
+
+같은 UMAP 좌표를 다음 세 방식으로 그리세요.
+
+1. cluster별 색상
+2. 세포 유형별 색상과 라벨
+3. sample별 패널 분리
+
+각 plot이 답할 수 있는 질문을 한 문장으로 적으세요.
+
+## 오늘의 핵심 {.summary}
+
+- `select`, `filter`, `mutate`, `group_by`, `summarise`는 표를 단계적으로 변환합니다.
+- 파이프는 데이터가 변하는 순서를 위에서 아래로 보여줍니다.
+- ggplot은 data, aesthetics, geometry로 읽습니다.
+- Seurat plot은 ggplot layer로 수정할 수 있습니다.
+- 좋은 시각화는 어떤 질문에 답하는지와 범례의 의미가 명확합니다.
+
+## 종료 점검 {.checkpoint}
+
+1. `filter()`와 `select()`는 각각 무엇을 선택하나요?
+2. `group_by()` 이후 계산은 어떻게 달라지나요?
+3. `aes()` 안과 밖의 `color`는 어떻게 다른가요?
+4. `group.by`와 `split.by`는 어떤 질문에 답하나요?
+
+## 다음 회차
+
+마지막 시간에는 1회차 Guided Clustering 코드를 다시 열어 직접 설명하고 자신의 데이터에 맞게 수정합니다.

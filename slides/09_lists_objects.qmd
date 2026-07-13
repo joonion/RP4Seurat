@@ -1,0 +1,285 @@
+---
+title: "리스트와 복합 객체"
+subtitle: "Seurat 객체 안의 분석 정보 탐색하기"
+author: "9회차"
+---
+
+## 오늘의 학습 목표 {.learning-objectives}
+
+1. 벡터, 데이터 프레임, 리스트의 구조적 차이를 설명할 수 있다.
+2. 복합 객체의 구성 요소를 안전하게 확인하고 접근할 수 있다.
+3. Seurat 객체의 assay, metadata, reduction이 맡는 역할을 구분할 수 있다.
+
+## 1회차에서 하나의 객체를 계속 사용했습니다
+
+```r
+pbmc <- NormalizeData(pbmc)
+pbmc <- RunPCA(pbmc)
+pbmc <- FindClusters(pbmc)
+pbmc <- RunUMAP(pbmc)
+```
+
+`pbmc` 안에는 서로 다른 형태의 분석 결과가 함께 저장됩니다.
+
+## 리스트는 서로 다른 객체를 함께 담습니다
+
+```r
+analysis_info <- list(
+  project = "pbmc3k",
+  dimensions = 1:10,
+  qc = data.frame(min_features = 200, max_percent_mt = 5),
+  marker_genes = c("MS4A1", "NKG7", "LYZ")
+)
+```
+
+문자, 숫자 벡터, 데이터 프레임을 한 객체 안에 저장할 수 있습니다.
+
+## 리스트 구조를 먼저 확인합니다
+
+```r
+class(analysis_info)
+length(analysis_info)
+names(analysis_info)
+str(analysis_info)
+```
+
+`str()`은 중첩된 객체의 전체 구조를 빠르게 보여줍니다.
+
+## [ ], [[ ]], $는 리스트에서 다르게 동작합니다
+
+```r
+analysis_info["project"]
+analysis_info[["project"]]
+analysis_info$project
+```
+
+| 표현 | 결과 |
+|---|---|
+| `[ ]` | 원소를 담은 리스트 유지 |
+| `[[ ]]` | 원소 자체를 꺼냄 |
+| `$` | 이름으로 원소 자체를 꺼냄 |
+
+## 중첩된 객체는 단계적으로 탐색합니다
+
+```r
+analysis_info$qc
+analysis_info$qc$min_features
+
+analysis_info[["qc"]][["min_features"]]
+```
+
+한 번에 긴 접근식을 쓰기 전에 중간 객체의 `class()`와 `str()`를 확인합니다.
+
+## Seurat는 리스트보다 더 엄격한 복합 객체입니다
+
+```r
+class(pbmc)
+pbmc
+```
+
+Seurat는 정해진 구조와 규칙을 가진 S4 객체입니다.
+
+- 여러 assay
+- cell metadata
+- PCA·UMAP reduction
+- 그래프와 이웃 정보
+- cluster identity
+
+## 객체를 출력하면 요약 정보를 볼 수 있습니다
+
+```r
+pbmc
+```
+
+확인할 항목:
+
+- feature와 cell 수
+- assay 수와 active assay
+- 저장된 layer
+- 계산된 dimensional reduction
+
+객체 전체를 직접 펼치기 전에 요약 출력을 읽습니다.
+
+## assay는 발현 행렬과 관련 정보를 담습니다
+
+```r
+Assays(pbmc)
+DefaultAssay(pbmc)
+pbmc[["RNA"]]
+```
+
+Seurat v5의 RNA assay에는 일반적으로 layer가 있습니다.
+
+```r
+Layers(pbmc[["RNA"]])
+```
+
+## layer에서 발현 행렬을 가져옵니다
+
+```r
+counts <- LayerData(
+  pbmc,
+  assay = "RNA",
+  layer = "counts"
+)
+
+normalized <- LayerData(
+  pbmc,
+  assay = "RNA",
+  layer = "data"
+)
+```
+
+- `counts`: 원시 count
+- `data`: 정규화된 값
+- `scale.data`: 스케일링된 값이 있을 수 있음
+
+::: {.warning}
+Seurat 버전에 따라 권장 accessor와 내부 구조가 달라질 수 있으므로 공식 문서를 확인합니다.
+:::
+
+## metadata는 세포별 정보를 담습니다
+
+```r
+head(pbmc[[]])
+head(pbmc@meta.data)
+```
+
+가능하면 공개 accessor를 우선 사용합니다.
+
+```r
+pbmc$nFeature_RNA
+pbmc$percent.mt
+```
+
+각 열의 길이는 세포 수와 같습니다.
+
+## reduction은 저차원 좌표를 담습니다
+
+```r
+Reductions(pbmc)
+pbmc[["pca"]]
+pbmc[["umap"]]
+
+Embeddings(pbmc, reduction = "umap")[1:5, ]
+```
+
+- 행: 세포
+- 열: PC 또는 UMAP 차원
+
+`DimPlot()`은 저장된 좌표와 identity를 이용해 그림을 만듭니다.
+
+## identity는 현재 세포 그룹을 나타냅니다
+
+```r
+head(Idents(pbmc))
+levels(pbmc)
+table(Idents(pbmc))
+```
+
+cluster ID 또는 세포 유형 이름처럼 현재 비교와 시각화에 사용할 그룹입니다.
+
+```r
+Idents(pbmc) <- "seurat_clusters"
+```
+
+## slot에 직접 접근하기 전에 accessor를 찾습니다
+
+```r
+# 내부 slot 직접 접근
+pbmc@meta.data
+
+# 의도가 명확한 accessor
+pbmc[[]]
+Idents(pbmc)
+Embeddings(pbmc, "umap")
+LayerData(pbmc, assay = "RNA", layer = "counts")
+```
+
+accessor는 객체 구조 변경에 더 안전하고 코드의 의도를 드러냅니다.
+
+## 객체를 복사해 안전하게 실험합니다
+
+```r
+pbmc.test <- pbmc
+pbmc.test <- FindClusters(pbmc.test, resolution = 0.8)
+```
+
+원본 객체와 다른 파라미터 결과를 비교할 때 유용합니다.
+
+```r
+table(Idents(pbmc))
+table(Idents(pbmc.test))
+```
+
+## saveRDS와 readRDS는 객체 전체를 보존합니다
+
+```r
+saveRDS(pbmc, "output/pbmc3k_final.rds")
+
+pbmc_restored <- readRDS("output/pbmc3k_final.rds")
+```
+
+불러온 뒤 구조를 확인합니다.
+
+```r
+class(pbmc_restored)
+dim(pbmc_restored)
+Reductions(pbmc_restored)
+```
+
+## 객체 접근 오류는 구조부터 확인합니다 {.debug}
+
+```r
+pbmc[["UMAP"]]
+```
+
+확인 순서:
+
+1. `class(pbmc)`
+2. `Reductions(pbmc)` 또는 `Assays(pbmc)`
+3. 대소문자와 정확한 이름
+4. 해당 분석 단계가 실제로 실행되었는지
+
+## 실습 1: Seurat 객체 지도 만들기 {.exercise}
+
+준비된 `pbmc` 객체에서 다음 결과를 기록하세요.
+
+1. cell과 feature 수
+2. assay 이름과 active assay
+3. metadata 열 이름
+4. reduction 이름
+5. identity level과 level별 세포 수
+
+## 실습 2: 입력 → 저장 위치 연결하기 {.exercise}
+
+다음 함수의 결과가 객체 어디에 저장되는지 연결하세요.
+
+```text
+NormalizeData()      RNA assay의 data layer
+RunPCA()             pca reduction
+FindNeighbors()      graph / neighbors
+FindClusters()       metadata와 identity
+RunUMAP()            umap reduction
+```
+
+각 위치를 확인하는 accessor도 하나씩 적으세요.
+
+## 오늘의 핵심 {.summary}
+
+- 리스트는 서로 다른 종류의 객체를 함께 저장합니다.
+- Seurat는 정해진 구조를 가진 복합 S4 객체입니다.
+- assay, metadata, reduction, identity는 역할이 다릅니다.
+- 내부 slot보다 공개 accessor를 우선 사용합니다.
+- 객체를 수정하기 전에 구조와 사용 가능한 이름을 확인합니다.
+
+## 종료 점검 {.checkpoint}
+
+1. 리스트에서 `[ ]`와 `[[ ]]`는 어떻게 다른가요?
+2. RNA assay의 `counts`와 `data` layer는 어떻게 다른가요?
+3. UMAP 좌표는 객체의 어느 구성 요소에 저장되나요?
+4. accessor를 사용하는 것이 직접 slot 접근보다 좋은 이유는 무엇인가요?
+
+## 다음 회차
+
+여러 유전자와 여러 샘플에 같은 작업을 적용하기 위해 반복문과 사용자 정의 함수를 배웁니다.

@@ -1,0 +1,223 @@
+---
+title: "행렬과 희소 행렬"
+subtitle: "유전자 × 세포 count matrix 이해하기"
+author: "6회차"
+---
+
+## 오늘의 학습 목표 {.learning-objectives}
+
+1. 행렬의 행, 열, 차원과 이름을 확인할 수 있다.
+2. `[행, 열]` 인덱싱으로 원하는 유전자와 세포를 선택할 수 있다.
+3. 단일세포 count matrix가 희소 행렬로 저장되는 이유를 설명할 수 있다.
+
+## 1회차 분석의 출발점은 행렬입니다
+
+```r
+pbmc.data <- Read10X(data.dir = "data/pbmc3k/")
+pbmc.data[c("CD3D", "TCL1A", "MS4A1"), 1:5]
+```
+
+- 행: 유전자 또는 feature
+- 열: 세포 barcode
+- 값: UMI count
+
+## 행렬은 같은 자료형의 2차원 구조입니다
+
+```r
+counts <- matrix(
+  c(4, 0, 1, 0, 6, 0),
+  nrow = 3,
+  ncol = 2
+)
+counts
+```
+
+벡터에 행과 열 차원을 부여한 구조로 생각할 수 있습니다.
+
+## 차원을 확인합니다
+
+```r
+dim(counts)
+nrow(counts)
+ncol(counts)
+length(counts)
+```
+
+- `dim()`: 행 수와 열 수
+- `nrow()`: 행 수
+- `ncol()`: 열 수
+- `length()`: 전체 원소 수
+
+## 행과 열에 이름을 붙입니다
+
+```r
+rownames(counts) <- c("CD3D", "MS4A1", "NKG7")
+colnames(counts) <- c("cell_A", "cell_B")
+
+rownames(counts)
+colnames(counts)
+```
+
+단일세포 행렬에서는 위치보다 유전자명과 barcode가 중요합니다.
+
+## [행, 열] 순서로 선택합니다
+
+```r
+counts[1, 2]
+counts[c(1, 3), 1]
+counts[, 1]
+counts[2, ]
+```
+
+- 쉼표 앞: 행
+- 쉼표 뒤: 열
+- 한쪽을 비우면 해당 방향 전체를 선택
+
+## 이름으로도 선택할 수 있습니다
+
+```r
+counts["MS4A1", "cell_B"]
+counts[c("CD3D", "NKG7"), ]
+counts[, c("cell_A", "cell_B")]
+```
+
+분석 코드에서는 행과 열의 의미를 보존하기 위해 이름 선택이 안전한 경우가 많습니다.
+
+## drop에 따라 결과 구조가 달라질 수 있습니다
+
+```r
+counts[1, ]
+counts[1, , drop = FALSE]
+```
+
+- 한 행만 선택하면 기본적으로 벡터가 될 수 있습니다.
+- `drop = FALSE`는 행렬 구조를 유지합니다.
+
+::: {.note}
+함수가 행렬 입력을 기대한다면 차원이 유지되는지 확인합니다.
+:::
+
+## 행과 열 단위로 요약합니다
+
+```r
+rowSums(counts)
+colSums(counts)
+rowMeans(counts)
+colMeans(counts)
+```
+
+- `rowSums()`: 유전자별 전체 count
+- `colSums()`: 세포별 전체 UMI count
+
+`nCount_RNA`는 세포별 count 합계와 연결됩니다.
+
+## 조건을 만족하는 값의 개수를 셉니다
+
+```r
+counts > 0
+rowSums(counts > 0)
+colSums(counts > 0)
+```
+
+- `rowSums(counts > 0)`: 각 유전자가 검출된 세포 수
+- `colSums(counts > 0)`: 각 세포에서 검출된 유전자 수
+
+`nFeature_RNA`의 직관적 의미입니다.
+
+## 단일세포 행렬은 대부분 0입니다
+
+```text
+3 x 5 sparse Matrix
+
+       cell1 cell2 cell3 cell4 cell5
+CD3D       4     .    10     .     1
+TCL1A      .     .     .     1     .
+MS4A1      .     6     .     .     1
+```
+
+`.`은 0을 압축하여 표시한 것입니다.
+
+## 희소 행렬은 0이 아닌 값만 중심으로 저장합니다
+
+```r
+object.size(pbmc.data)
+object.size(as.matrix(pbmc.data))
+```
+
+- dense matrix: 모든 0까지 저장
+- sparse matrix: 0이 아닌 값과 위치를 저장
+- 대규모 단일세포 데이터의 메모리와 계산 시간을 절약
+
+::: {.warning}
+`as.matrix()`로 무심코 변환하면 매우 큰 메모리를 사용할 수 있습니다.
+:::
+
+## 희소 행렬도 기본적인 방식으로 탐색합니다
+
+```r
+class(pbmc.data)
+dim(pbmc.data)
+pbmc.data[1:5, 1:5]
+Matrix::colSums(pbmc.data)
+```
+
+객체 클래스는 다르지만 차원 확인과 인덱싱 원리는 같습니다.
+
+## 행렬 방향을 항상 확인합니다 {.debug}
+
+```r
+dim(pbmc.data)
+head(rownames(pbmc.data))
+head(colnames(pbmc.data))
+```
+
+분석 도구에 따라 행과 열의 방향이 다를 수 있습니다.
+
+확인 질문:
+
+1. 행 이름이 유전자인가?
+2. 열 이름이 cell barcode인가?
+3. 값이 count인가, 정규화된 값인가?
+
+## 실습 1: 작은 count matrix 탐색하기 {.exercise}
+
+```r
+toy <- matrix(c(2, 0, 3, 0, 5, 1, 0, 0, 4), nrow = 3)
+rownames(toy) <- c("CD3D", "MS4A1", "NKG7")
+colnames(toy) <- c("cell1", "cell2", "cell3")
+```
+
+1. 차원을 확인하세요.
+2. `MS4A1` 행을 행렬로 유지해 선택하세요.
+3. 세포별 전체 count와 검출 유전자 수를 계산하세요.
+
+## 실습 2: sparse와 dense 비교하기 {.exercise}
+
+PBMC 행렬이 준비되어 있다면 다음을 비교하세요.
+
+```r
+sparse_size <- object.size(pbmc.data)
+dense_size <- object.size(as.matrix(pbmc.data))
+dense_size / sparse_size
+```
+
+두 객체의 크기가 다른 이유를 한 문장으로 설명하세요.
+
+## 오늘의 핵심 {.summary}
+
+- count matrix의 행은 유전자, 열은 세포입니다.
+- 행렬은 `[행, 열]`로 선택합니다.
+- `rowSums()`와 `colSums()`는 방향별 요약을 계산합니다.
+- 희소 행렬은 많은 0을 효율적으로 저장합니다.
+- 큰 희소 행렬을 dense matrix로 변환할 때 주의합니다.
+
+## 종료 점검 {.checkpoint}
+
+1. `x[2, ]`와 `x[, 2]`는 어떻게 다른가요?
+2. 세포별 전체 UMI count는 어느 방향으로 합산하나요?
+3. `drop = FALSE`는 왜 사용하나요?
+4. 단일세포 데이터에 희소 행렬이 적합한 이유는 무엇인가요?
+
+## 다음 회차
+
+count matrix가 발현값을 저장한다면, cell metadata는 각 세포의 QC와 그룹 정보를 표로 저장합니다.

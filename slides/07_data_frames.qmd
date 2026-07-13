@@ -1,0 +1,223 @@
+---
+title: "데이터 프레임과 tibble"
+subtitle: "Seurat cell metadata를 표로 탐색하기"
+author: "7회차"
+---
+
+## 오늘의 학습 목표 {.learning-objectives}
+
+1. 데이터 프레임의 행과 열이 나타내는 의미를 설명할 수 있다.
+2. `$`, `[[ ]]`, `[ ]`를 사용해 열과 값을 선택할 수 있다.
+3. Seurat metadata에서 세포별 QC 지표를 확인하고 요약할 수 있다.
+
+## 1회차에서 metadata를 확인했습니다
+
+```r
+head(pbmc@meta.data, 5)
+```
+
+```text
+                  orig.ident nCount_RNA nFeature_RNA percent.mt
+AAACATACAACCAC-1  pbmc3k          2419          779       3.02
+AAACATTGAGCTAC-1  pbmc3k          4903         1352       3.79
+```
+
+행 하나는 세포 하나, 열 하나는 세포의 변수 하나입니다.
+
+## 데이터 프레임은 열마다 자료형이 다를 수 있습니다
+
+```r
+cell_meta <- data.frame(
+  cell = c("cell1", "cell2", "cell3"),
+  nCount_RNA = c(2419, 4903, 980),
+  percent_mt = c(3.02, 3.79, 1.22),
+  pass_qc = c(TRUE, TRUE, FALSE)
+)
+```
+
+- `cell`: character
+- `nCount_RNA`, `percent_mt`: numeric
+- `pass_qc`: logical
+
+## 구조를 먼저 확인합니다
+
+```r
+class(cell_meta)
+dim(cell_meta)
+names(cell_meta)
+str(cell_meta)
+head(cell_meta)
+summary(cell_meta)
+```
+
+분석 전에 “행이 무엇이고 열이 무엇인지” 확인하는 습관을 만듭니다.
+
+## $로 한 열을 선택합니다
+
+```r
+cell_meta$nCount_RNA
+cell_meta$percent_mt
+```
+
+- 결과는 보통 벡터입니다.
+- 코드에 열 이름을 직접 작성할 때 간단합니다.
+- 존재하지 않는 열 이름은 의도하지 않은 결과를 만들 수 있으므로 확인합니다.
+
+## [[ ]]도 한 열을 벡터로 꺼냅니다
+
+```r
+cell_meta[["nCount_RNA"]]
+
+column_name <- "percent_mt"
+cell_meta[[column_name]]
+```
+
+열 이름이 다른 객체에 저장되어 있을 때 `[[ ]]`가 유용합니다.
+
+## [ ]는 데이터 프레임 구조를 유지합니다
+
+```r
+cell_meta["nCount_RNA"]
+cell_meta[c("nCount_RNA", "percent_mt")]
+cell_meta[1:2, c("cell", "percent_mt")]
+```
+
+```text
+data[행, 열]
+```
+
+행과 열을 함께 선택할 수 있습니다.
+
+## 세 접근 방식의 차이
+
+| 표현 | 일반적인 결과 | 용도 |
+|---|---|---|
+| `df$col` | 벡터 | 고정된 열 이름을 직접 사용 |
+| `df[["col"]]` | 벡터 | 문자 객체로 열 선택 |
+| `df["col"]` | 데이터 프레임 | 표 구조 유지 |
+
+결과를 함수에 전달할 때 벡터가 필요한지 표가 필요한지 확인합니다.
+
+## 행 이름은 세포 식별자입니다
+
+```r
+rownames(pbmc@meta.data)[1:5]
+```
+
+Seurat metadata의 행 이름은 일반적으로 cell barcode입니다.
+
+```r
+all(rownames(pbmc@meta.data) == colnames(pbmc))
+```
+
+metadata 행과 count matrix 열이 같은 세포를 같은 순서로 나타내는지 확인할 수 있습니다.
+
+## 새 열을 추가할 수 있습니다
+
+```r
+cell_meta$high_mt <- cell_meta$percent_mt >= 5
+cell_meta$log_count <- log1p(cell_meta$nCount_RNA)
+```
+
+Seurat에서는 다음과 같은 코드도 metadata 열을 추가합니다.
+
+```r
+pbmc[["percent.mt"]] <- PercentageFeatureSet(pbmc, pattern = "^MT-")
+```
+
+## 조건으로 행을 선택합니다
+
+```r
+cell_meta[cell_meta$percent_mt < 5, ]
+
+keep <- cell_meta$nCount_RNA > 1000 & cell_meta$percent_mt < 5
+cell_meta[keep, ]
+```
+
+쉼표를 빠뜨리면 행이 아니라 열 선택으로 해석될 수 있습니다.
+
+## tibble은 데이터 프레임의 현대적인 변형입니다
+
+```r
+library(tibble)
+cell_tbl <- as_tibble(cell_meta)
+cell_tbl
+```
+
+- 큰 표를 콘솔에 보기 좋게 출력합니다.
+- 열 자료형을 함께 보여줍니다.
+- tidyverse 함수와 함께 자주 사용합니다.
+
+## tibble은 행 이름보다 명시적인 열을 권장합니다
+
+```r
+meta_tbl <- pbmc@meta.data %>%
+  rownames_to_column(var = "cell_id") %>%
+  as_tibble()
+```
+
+cell barcode를 일반 열로 만들면 join, filter, export가 명확해집니다.
+
+## 기본 요약 통계를 계산합니다
+
+```r
+mean(cell_meta$nCount_RNA)
+median(cell_meta$nCount_RNA)
+min(cell_meta$percent_mt)
+max(cell_meta$percent_mt)
+table(cell_meta$pass_qc)
+```
+
+분포가 치우친 QC 값은 평균과 중앙값을 함께 확인합니다.
+
+## CSV로 내보내고 다시 읽을 수 있습니다
+
+```r
+write.csv(cell_meta, "output/cell_metadata.csv", row.names = FALSE)
+metadata_copy <- read.csv("output/cell_metadata.csv")
+```
+
+내보낸 뒤 다음을 확인합니다.
+
+- 행 수와 열 수
+- 열 이름
+- 자료형
+- cell ID 보존 여부
+
+## 실습 1: metadata 탐색하기 {.exercise}
+
+`pbmc@meta.data`에서 다음을 확인하세요.
+
+1. 행과 열의 수
+2. 모든 열 이름
+3. `nFeature_RNA`의 최소값, 중앙값, 최대값
+4. `percent.mt`가 가장 높은 세포의 barcode
+
+## 실습 2: QC 상태 열 추가하기 {.exercise}
+
+작은 `cell_meta` 데이터 프레임에 다음 조건을 만족하는 `pass_qc` 열을 추가하세요.
+
+- `nFeature_RNA > 200`
+- `nFeature_RNA < 2500`
+- `percent.mt < 5`
+
+`table(cell_meta$pass_qc)`로 결과를 확인하세요.
+
+## 오늘의 핵심 {.summary}
+
+- 데이터 프레임의 행은 관측값, 열은 변수입니다.
+- `$`와 `[[ ]]`는 한 열을 벡터로 꺼냅니다.
+- `[행, 열]`은 표 형태로 행과 열을 선택합니다.
+- Seurat metadata의 행은 세포, 열은 QC·그룹 정보입니다.
+- `str()`, `head()`, `summary()`로 구조와 값을 점검합니다.
+
+## 종료 점검 {.checkpoint}
+
+1. 행렬과 데이터 프레임의 가장 중요한 차이는 무엇인가요?
+2. `df["x"]`와 `df[["x"]]`의 결과는 어떻게 다른가요?
+3. Seurat metadata의 행 이름은 무엇을 나타내나요?
+4. cell barcode를 일반 열로 만들면 어떤 장점이 있나요?
+
+## 다음 회차
+
+metadata의 QC 열을 조건식으로 결합하여 분석에 사용할 세포를 선택합니다.

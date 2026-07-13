@@ -10,7 +10,7 @@
 /slides/*.pptx
 
 # Generated lab results
-/labs/output/
+/labs/output/*.*
 
 # R and RStudio session files
 .Rproj.user/

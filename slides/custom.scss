@@ -123,8 +123,46 @@ $border-color: #cbd5e1;
   color: #63310a;
 }
 
-.reveal pre { width: 100%; margin: 0.48em 0; border: 1px solid var(--lecture-border); border-left: 5px solid var(--lecture-primary); border-radius: 0; box-shadow: none; background: var(--lecture-code-bg); max-height: 58vh; overflow: auto; }
-.reveal pre code { padding: 0.78em 0.9em; line-height: 1.38; tab-size: 2; }
+.reveal pre {
+  width: 100%;
+  margin: 0.48em 0;
+  border: 1px solid var(--lecture-border);
+  border-left: 5px solid var(--lecture-primary);
+  border-radius: 0;
+  box-shadow: none;
+  background: var(--lecture-code-bg);
+  max-height: 58vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.reveal .slides div.sourceCode {
+  margin: 0.48em 0;
+  border: 1px solid var(--lecture-border);
+  border-left: 5px solid var(--lecture-primary);
+  border-radius: 0;
+  background: var(--lecture-code-bg);
+  overflow: hidden;
+}
+.reveal .slides div.sourceCode > pre {
+  margin: 0;
+  border: 0;
+  max-height: 58vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.reveal pre code {
+  padding: 0.78em 0.9em;
+  line-height: 1.38;
+  tab-size: 2;
+  white-space: pre-wrap;
+  overflow: visible;
+  overflow-wrap: anywhere;
+}
+.reveal pre > code.sourceCode > span {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 .reveal code:not(pre code) { padding: 0.05em 0.22em; border: 1px solid #dbe3ee; background: var(--lecture-code-bg); color: #173b73; }
 
 .reveal .footer { left: 3.3%; bottom: 1.8%; color: #6b778c; font-size: 0.38em; letter-spacing: 0.02em; }

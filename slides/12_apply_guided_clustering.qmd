@@ -570,3 +570,10 @@ Layers(brain[["RNA"]])
   <https://bioconductor.org/packages/release/data/experiment/manuals/scRNAseq/man/scRNAseq.pdf>
 
 사용한 로컬 환경의 버전은 실습 마지막의 `sessionInfo()`와 `packageVersion()`으로 기록합니다.
+
+## 향후 과제
+
+- Scanpy: Python 기반의 전사체 분석 도구
+- [Scanpy Clustering Tutorial](https://scanpy.readthedocs.io/en/stable/tutorials/basics/clustering.html)
+- Positron: R/Python/Jupyter Notebook 통합 IDE
+- 생성형 AI의 활용: ChatGPT Codex or Claude Code

@@ -576,4 +576,4 @@ Layers(brain[["RNA"]])
 - Scanpy: Python 기반의 전사체 분석 도구
 - [Scanpy Clustering Tutorial](https://scanpy.readthedocs.io/en/stable/tutorials/basics/clustering.html)
 - Positron: R/Python/Jupyter Notebook 통합 IDE
-- 생성형 AI의 활용: ChatGPT Codex or Claude Code
+- 생성형 AI의 활용: ChatGPT Codex 또는 Claude Code

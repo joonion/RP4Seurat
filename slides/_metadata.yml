@@ -15,6 +15,7 @@ format:
     controls-tutorial: false
     progress: false
     hash: true
+    chalkboard: true
     footer: "Seurat 분석을 위한 R 프로그래밍"
     highlight-style: github
   pptx:

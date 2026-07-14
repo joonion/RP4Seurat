@@ -2,6 +2,12 @@
 title: "값, 변수, 기본 자료형"
 subtitle: "분석 파라미터가 R에서 표현되는 방식"
 author: "3회차"
+execute:
+  echo: true
+  output: true
+  warning: false
+  message: false
+  freeze: auto
 ---
 
 ## 오늘의 학습 목표 {.learning-objectives}
@@ -38,7 +44,9 @@ pbmc <- CreateSeuratObject(
 
 ## 숫자는 계산할 수 있습니다
 
-```r
+```{r}
+#| label: numbers-calculation
+
 min_features <- 200
 max_features <- 2500
 feature_range <- max_features - min_features
@@ -49,7 +57,9 @@ resolution * 2
 
 R의 일반적인 소수 숫자는 내부적으로 `double`입니다.
 
-```r
+```{r}
+#| label: number-storage-types
+
 typeof(200)
 typeof(200L)
 ```
@@ -74,7 +84,9 @@ MS4A1
 
 ## logical은 참과 거짓을 나타냅니다
 
-```r
+```{r}
+#| label: logical-comparisons
+
 only_positive <- TRUE
 show_legend <- FALSE
 
@@ -91,7 +103,9 @@ min_features > 1000
 
 ## 객체의 자료형을 확인합니다
 
-```r
+```{r}
+#| label: inspect-basic-types
+
 project_name <- "pbmc3k"
 resolution <- 0.5
 only_positive <- TRUE
@@ -107,7 +121,9 @@ is.logical(only_positive)
 
 ## 길이는 값의 개수를 알려줍니다
 
-```r
+```{r}
+#| label: object-lengths
+
 marker_gene <- "MS4A1"
 marker_genes <- c("MS4A1", "GNLY", "CD3E")
 
@@ -119,7 +135,9 @@ length(marker_genes)
 
 ## 자료형은 필요할 때 변환할 수 있습니다
 
-```r
+```{r}
+#| label: type-conversion
+
 as.character(200)
 as.numeric("200")
 as.logical(1)
@@ -127,14 +145,18 @@ as.logical(1)
 
 변환할 수 없는 문자는 결측값을 만듭니다.
 
-```r
+```{r}
+#| label: invalid-number-conversion
+#| warning: true
+
 as.numeric("MS4A1")
-# Warning: NAs introduced by coercion
 ```
 
 ## NA는 값이 없음을 나타냅니다
 
-```r
+```{r}
+#| label: missing-value-check
+
 qc_score <- NA
 is.na(qc_score)
 ```
@@ -145,7 +167,9 @@ is.na(qc_score)
 
 ## NA가 있으면 계산 결과도 NA가 될 수 있습니다
 
-```r
+```{r}
+#| label: missing-value-calculation
+
 qc_values <- c(100, 200, NA, 400)
 
 mean(qc_values)
@@ -160,7 +184,9 @@ mean(qc_values, na.rm = TRUE)
 
 ## factor는 범주와 순서를 저장합니다
 
-```r
+```{r}
+#| label: factor-basics
+
 cluster <- factor(c("0", "1", "0", "2"))
 cluster
 levels(cluster)

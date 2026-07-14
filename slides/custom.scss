@@ -151,8 +151,8 @@ $border-color: #cbd5e1;
   overflow-x: hidden;
 }
 .reveal pre code {
-  padding: 0.78em 0.9em;
-  line-height: 1.38;
+  padding: 0.4em 0.9em;
+  line-height: 0.8 !important;
   tab-size: 2;
   white-space: pre-wrap;
   overflow: visible;
@@ -161,7 +161,13 @@ $border-color: #cbd5e1;
 .reveal pre > code.sourceCode > span {
   display: block;
   min-width: 0;
+  line-height: 0.8 !important;
   overflow-wrap: anywhere;
+}
+.reveal pre > code.sourceCode > span:empty { height: 0.65em !important; }
+.reveal pre > code.sourceCode > span > a,
+.reveal pre > code.sourceCode > span > a:first-child::before {
+  line-height: 0.8 !important;
 }
 .reveal code:not(pre code) { padding: 0.05em 0.22em; border: 1px solid #dbe3ee; background: var(--lecture-code-bg); color: #173b73; }
 

@@ -1,0 +1,61 @@
+.reveal .slides section:is(
+  #숫자는-계산할-수-있습니다,
+  #logical은-참과-거짓을-나타냅니다,
+  #객체의-자료형을-확인합니다,
+  #길이는-값의-개수를-알려줍니다,
+  #자료형은-필요할-때-변환할-수-있습니다,
+  #na는-값이-없음을-나타냅니다,
+  #na가-있으면-계산-결과도-na가-될-수-있습니다,
+  #factor는-범주와-순서를-저장합니다
+) .cell > div.sourceCode.cell-code {
+  margin: 0.16em 0 0;
+}
+
+.reveal .slides section:is(
+  #숫자는-계산할-수-있습니다,
+  #logical은-참과-거짓을-나타냅니다,
+  #객체의-자료형을-확인합니다,
+  #길이는-값의-개수를-알려줍니다,
+  #자료형은-필요할-때-변환할-수-있습니다,
+  #na는-값이-없음을-나타냅니다,
+  #na가-있으면-계산-결과도-na가-될-수-있습니다,
+  #factor는-범주와-순서를-저장합니다
+) .cell > .cell-output pre {
+  margin: 0;
+  border: 0;
+  border-left: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  max-height: none;
+  overflow: visible;
+}
+
+.reveal .slides section:is(
+  #숫자는-계산할-수-있습니다,
+  #logical은-참과-거짓을-나타냅니다,
+  #객체의-자료형을-확인합니다,
+  #길이는-값의-개수를-알려줍니다,
+  #자료형은-필요할-때-변환할-수-있습니다,
+  #na는-값이-없음을-나타냅니다,
+  #na가-있으면-계산-결과도-na가-될-수-있습니다,
+  #factor는-범주와-순서를-저장합니다
+) .cell > .cell-output pre code {
+  padding: 0.06em 0.18em 0.16em;
+  background: transparent;
+  color: var(--lecture-muted);
+  line-height: 1.25;
+}
+
+.reveal .slides section:is(
+  #숫자는-계산할-수-있습니다,
+  #logical은-참과-거짓을-나타냅니다,
+  #객체의-자료형을-확인합니다,
+  #길이는-값의-개수를-알려줍니다,
+  #자료형은-필요할-때-변환할-수-있습니다,
+  #na는-값이-없음을-나타냅니다,
+  #na가-있으면-계산-결과도-na가-될-수-있습니다,
+  #factor는-범주와-순서를-저장합니다
+) .cell > .cell-output-stderr pre code {
+  color: #8a3f06;
+}
